@@ -2,9 +2,9 @@
 A thing to demonstrate making hash-source directives for static files in CSP
 """
 from base64 import b64encode
-from BeautifulSoup import BeautifulSoup
 import hashlib
 import sys
+import html5lib
 
 hashers = {
         'sha256':hashlib.sha256,
@@ -17,11 +17,21 @@ def makeHashSource(alg, scr):
     hasher.update(scr)
     return alg+'-'+b64encode(hasher.digest())
 
+def getScripts(doc):
+    scripts = []
+    document = html5lib.parse(doc)
+    for script in document.iter('{http://www.w3.org/1999/xhtml}script'):
+        scripts.append(script.text)
+    return scripts
+
 def makeHashSources(alg, doc):
-    soup = BeautifulSoup(doc)
     sources = []
-    for script in soup.findAll('script'):
-        sources.append(makeHashSource(alg, script.contents[0]))
+    script_bodies = []
+
+    script_bodies = getScripts(doc)
+
+    for script in script_bodies:
+        sources.append(makeHashSource(alg, script))
     return sources
 
 if __name__ == '__main__':
