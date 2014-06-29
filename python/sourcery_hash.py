@@ -5,6 +5,7 @@ from base64 import b64encode
 import hashlib
 import sys
 import html5lib
+import getopt
 
 hashers = {
         'sha256':hashlib.sha256,
@@ -24,30 +25,59 @@ def getScripts(doc):
         scripts.append(script.text)
     return scripts
 
-def makeHashSources(alg, doc):
-    sources = []
-    script_bodies = []
+def getStyles(doc):
+    styles = []
+    document = html5lib.parse(doc)
+    for style in document.iter('{http://www.w3.org/1999/xhtml}style'):
+        styles.append(style.text)
+    return styles
+
+def makeHashSources(alg, doc, hash_scripts, hash_styles):
+    script_sources = []
+    style_sources = []
 
     script_bodies = getScripts(doc)
+    style_bodies = getStyles(doc)
 
-    for script in script_bodies:
-        sources.append(makeHashSource(alg, script))
-    return sources
+    if hash_scripts:
+        for script in script_bodies:
+            script_sources.append(makeHashSource(alg, script))
+    if hash_styles:
+        for style in style_bodies:
+            style_sources.append(makeHashSource(alg, style))
+
+    return script_sources, style_sources
 
 if __name__ == '__main__':
-    sources = []
+    script_sources = []
+    style_sources = []
 
-    files = sys.argv[1:]
+    options, files = getopt.getopt(sys.argv[1:],'',['scripts','styles'])
+
+    hash_scripts = False
+    hash_styles = False
+
+    for opt, val in options:
+        if '--scripts' == opt:
+            hash_scripts = True
+        if '--styles' == opt:
+            hash_styles = True
+
     for f in files:
         html = ''
         if len(sys.argv) > 1:
             html = open(f).read()
 
-        for source in makeHashSources('sha256',html):
-            sources.append(source)
+        script_sources, style_sources =  makeHashSources('sha256', html, hash_scripts, hash_styles)
 
     f = open('dot_htaccess','w')
-    f.write('Header always set Content-Security-Policy "default-src \'self\'; script-src')
-    for source in sources:
-        f.write(" '"+source+"'")
+    f.write('Header always set Content-Security-Policy "default-src \'self\'')
+    if len(script_sources) > 0:
+        f.write('; script-src')
+        for source in script_sources:
+            f.write(" '"+source+"'")
+    if len(style_sources) > 0:
+        f.write('; style-src')
+        for source in style_sources:
+            f.write(" '"+source+"'")
     f.write('"')
