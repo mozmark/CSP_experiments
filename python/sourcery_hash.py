@@ -7,6 +7,27 @@ import sys
 import html5lib
 import getopt
 
+class CSP:
+    directives = {}
+
+    def __init__(self, policy_string):
+        directive_strings = [ps.rstrip() for ps in policy_string.split(';')]
+        for directive in directive_strings:
+            if len(directive) > 0:
+                name, value = directive.split(' ',1)
+                self.directives[name] = value
+
+    def append_source(self, directive, source):
+        current_sources = ''
+        try:
+            current_sources = self.directives[directive]
+        except:
+            pass
+        self.directives[directive] = current_sources + ' ' + source
+
+    def tostring(self):
+        return '; '.join([name+' '+self.directives[name] for name in self.directives.keys()])
+
 hashers = {
         'sha256':hashlib.sha256,
         'sha384':hashlib.sha384,
@@ -16,7 +37,7 @@ hashers = {
 def makeHashSource(alg, scr):
     hasher = hashers[alg]()
     hasher.update(scr)
-    return alg+'-'+b64encode(hasher.digest())
+    return "'%s-%s'"%(alg, b64encode(hasher.digest()))
 
 def getScripts(doc):
     scripts = []
@@ -52,16 +73,21 @@ if __name__ == '__main__':
     script_sources = []
     style_sources = []
 
-    options, files = getopt.getopt(sys.argv[1:],'',['scripts','styles'])
+    options, files = getopt.getopt(sys.argv[1:],'',['scripts','styles','existing='])
 
     hash_scripts = False
     hash_styles = False
+    existing = ''
 
     for opt, val in options:
         if '--scripts' == opt:
             hash_scripts = True
         if '--styles' == opt:
             hash_styles = True
+        if '--existing' == opt:
+            existing = val
+
+    policy = CSP(existing)
 
     for f in files:
         html = ''
@@ -71,13 +97,10 @@ if __name__ == '__main__':
         script_sources, style_sources =  makeHashSources('sha256', html, hash_scripts, hash_styles)
 
     f = open('dot_htaccess','w')
-    f.write('Header always set Content-Security-Policy "default-src \'self\'')
     if len(script_sources) > 0:
-        f.write('; script-src')
         for source in script_sources:
-            f.write(" '"+source+"'")
+            policy.append_source('script-src', source)
     if len(style_sources) > 0:
-        f.write('; style-src')
         for source in style_sources:
-            f.write(" '"+source+"'")
-    f.write('"')
+            policy.append_source('style-src', source)
+    f.write("Header always set Content-Security-Policy \"%s\""%(policy.tostring()))
