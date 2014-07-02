@@ -3,52 +3,25 @@ from jinja2.ext import Extension
 
 
 class ScriptExtension(Extension):
-    # a set of names that trigger the extension.
     tags = set(['script'])
-
-    def __init__(self, environment):
-        super(ScriptExtension, self).__init__(environment)
-
-        # add the defaults to the environment
-        environment.extend(
-        )
 
     def parse(self, parser):
         lineno = parser.stream.next().lineno
 
-        args = [parser.parse_expression()]
-        print args
+        ctx_ref = nodes.ContextReference()
 
-        if parser.stream.skip_if('comma'):
-            args.append(parser.parse_expression())
-        else:
-            args.append(nodes.Const(None))
-
-        # now we parse the body of the script block up to `endscript` and
-        # drop the needle (which would always be `endscript` in that case)
         body = parser.parse_statements(['name:endscript'], drop_needle=True)
-        if len(body[0].nodes) > 1:
-            raise Exception('Oh noes!')
 
-        # now return a `CallBlock` node that calls our _script_support
-        # helper method on this extension.
-        return nodes.CallBlock(self.call_method('_script_support', args),
-                               [], [], body).set_lineno(lineno)
+        # TODO: Check we've an output node
+        # if this is not 'unsafe' and we have dangerous children, bail out
+        if len(body[0].nodes) > 1 or type(body[0].nodes[0]) != nodes.TemplateData:
+            raise Exception('{% script %} tag has an unsafe body')
 
-    def _script_support(self, name, timeout, caller):
+        node = self.call_method('_render_script', [ctx_ref], lineno=lineno)
+        return nodes.CallBlock(node, [], [], body).set_lineno(lineno)
+
+    def _render_script(self, context, caller):
         """Helper callback."""
-        print 'in support',name
-        rv = caller()
+        nonce = context['csp_nonce']
+        rv = "<script nonce=\"%s\">" % (nonce) + caller() + "</script>"
         return rv
-
-from jinja2 import Environment
-
-env = Environment(extensions=[ScriptExtension])
-
-from jinja2 import Template
-t = """{% script 'something' %}
-<div class="sidebar">
-</div>
-{% endscript %}"""
-template = env.from_string(t)
-print template.render()
