@@ -96,11 +96,12 @@ if __name__ == '__main__':
 
         script_sources, style_sources =  makeHashSources('sha256', html, hash_scripts, hash_styles)
 
+        if len(script_sources) > 0:
+            for source in script_sources:
+                policy.append_source('script-src', source)
+        if len(style_sources) > 0:
+            for source in style_sources:
+                policy.append_source('style-src', source)
+
     f = open('dot_htaccess','w')
-    if len(script_sources) > 0:
-        for source in script_sources:
-            policy.append_source('script-src', source)
-    if len(style_sources) > 0:
-        for source in style_sources:
-            policy.append_source('style-src', source)
     f.write("Header always set Content-Security-Policy \"%s\""%(policy.tostring()))
