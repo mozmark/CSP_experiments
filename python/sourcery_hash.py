@@ -73,10 +73,11 @@ if __name__ == '__main__':
     script_sources = []
     style_sources = []
 
-    options, files = getopt.getopt(sys.argv[1:],'',['scripts','styles','existing='])
+    options, files = getopt.getopt(sys.argv[1:],'',['scripts','styles','htaccess','existing='])
 
     hash_scripts = False
     hash_styles = False
+    htaccess = False
     existing = ''
 
     for opt, val in options:
@@ -84,6 +85,8 @@ if __name__ == '__main__':
             hash_scripts = True
         if '--styles' == opt:
             hash_styles = True
+        if '--htaccess' == opt:
+            htaccess = True
         if '--existing' == opt:
             existing = val
 
@@ -103,5 +106,10 @@ if __name__ == '__main__':
             for source in style_sources:
                 policy.append_source('style-src', source)
 
-    f = open('dot_htaccess','w')
-    f.write("Header always set Content-Security-Policy \"%s\""%(policy.tostring()))
+    if htaccess:
+        filename = 'dot_htaccess'
+        f = open(filename,'w')
+        f.write("Header always set Content-Security-Policy \"%s\""%(policy.tostring()))
+        print 'policy written to %s'%(filename)
+    else:
+        print policy.tostring()
